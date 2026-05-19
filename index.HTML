@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>網路基礎認證 - 終極模擬考</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --bg: #f4f7f6;
+            --text: #333;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
+        .question-title { font-size: 1.2em; font-weight: bold; margin-bottom: 15px; }
+        .help-text { color: #7f8c8d; font-size: 0.9em; margin-bottom: 10px; }
+        
+        /* 選擇題樣式 */
+        .options-list { list-style-type: none; padding: 0; }
+        .option-item { display: flex; align-items: center; background: #f9f9f9; border: 1px solid #ddd; margin-bottom: 10px; padding: 12px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .option-item:hover { background: #e9ecef; }
+        .option-item input { margin-right: 15px; transform: scale(1.2); cursor: pointer; }
+        
+        /* 矩陣題與下拉題樣式 */
+        .matrix-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .matrix-table th, .matrix-table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .matrix-table td:first-child { text-align: left; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 1em; width: 100%; max-width: 300px; margin-bottom: 10px;}
+        
+        /* 按鈕區 */
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 30px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; color: #fff; transition: 0.3s; }
+        .btn-prev { background: #95a5a6; }
+        .btn-prev:hover { background: #7f8c8d; }
+        .btn-next { background: var(--secondary); }
+        .btn-next:hover { background: #2980b9; }
+        .btn-submit { background: var(--success); display: none; }
+        .btn-submit:hover { background: #2ecc71; }
+        
+        /* 成績與檢討區 */
+        #result-screen { display: none; }
+        .score-display { text-align: center; margin-bottom: 30px; }
+        .score-display h1 { font-size: 4em; color: var(--primary); margin: 10px 0; }
+        .review-card { background: #fff; border-left: 5px solid var(--danger); box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 15px; margin-bottom: 20px; border-radius: 0 4px 4px 0; }
+        .orig-id-badge { display: inline-block; background: var(--danger); color: white; padding: 3px 8px; border-radius: 3px; font-size: 0.85em; font-weight: bold; margin-bottom: 10px; }
+        .ans-wrong { color: var(--danger); font-weight: bold; }
+        .ans-correct { color: var(--success); font-weight: bold; margin-top: 5px;}
+    </style>
+</head>
+<body>
+
+<div class="container" id="app">
+    <div id="quiz-screen">
+        <div class="header">
+            <h2 id="progress-text">準備中...</h2>
+        </div>
+        <div id="question-container"></div>
+        <div class="nav-buttons">
+            <button class="btn btn-prev" id="btn-prev" onclick="changeQuestion(-1)">上一題</button>
+            <button class="btn btn-next" id="btn-next" onclick="changeQuestion(1)">下一題</button>
+            <button class="btn btn-submit" id="btn-submit" onclick="submitExam()">交卷</button>
+        </div>
+    </div>
+
+    <div id="result-screen">
+        <div class="score-display">
+            <h2>測驗結束</h2>
+            <h1 id="final-score">0 / 0</h1>
+            <button class="btn btn-next" onclick="location.reload()" style="margin-top: 20px;">重新測驗</button>
+        </div>
+        <h3>錯題檢討：</h3>
+        <div id="review-container"></div>
+    </div>
+</div>
+
+<script>
+    // --- 題庫資料 (已包含全部35題，支援多種題型) ---
+    const rawData = [
+        { origId: 2, type: 'radio', q: '財務部門抱怨網路慢。顯示100Mbps但應是1000Mbps。該用哪種工具判斷纜線能否達到1000Mbps？', opts: ['音頻查線器', '纜線測試器', '萬用電表', '時域反射計 (TDR)'], ans: ['纜線測試器'] },
+        { origId: 3, type: 'checkbox', count: 3, q: '客戶無法存取網際網路，您應該先完成哪三個動作？', opts: ['要求客戶將系統更新', '要求客戶刪除 Hosts 檔案', '要求客戶檢查數據機上的狀態指示燈', '要求客戶重新啟動數據機', '從遠端登入客戶的電腦', '執行線路測試檢查 ISP 連線'], ans: ['要求客戶檢查數據機上的狀態指示燈', '要求客戶重新啟動數據機', '執行線路測試檢查 ISP 連線'] },
+        { origId: 4, type: 'radio', q: '哪種類型的網路涵蓋最大的區域？', opts: ['WAN', 'CAN', 'PAN', 'LAN'], ans: ['WAN'] },
+        { origId: 5, type: 'radio', q: '哪一種無線驗證方法提供最高等級的安全性？', opts: ['WPS 驗證', '有線等效加密 (WEP)', 'Wi-Fi 保護的存取 (WPA)', 'Wi-Fi 保護的存取 2 (WPA2)'], ans: ['Wi-Fi 保護的存取 2 (WPA2)'] },
+        { origId: 6, type: 'radio', q: '想要保護內部網路以免遭到入侵，網頁伺服器該怎麼處理？', opts: ['將網頁伺服器的 IP 設定為區域網路內部', '將防火牆設定為封鎖 80 和 443', '將網頁伺服器部署在 DMZ 中', '隱藏伺服器 SSID'], ans: ['將網頁伺服器部署在 DMZ 中'] },
+        { origId: 7, type: 'checkbox', count: 2, q: '將伺服器移轉到雲端架構後，哪兩種管理責任將會減少？', opts: ['更換故障的伺服器硬體', '更新伺服器作業系統', '管理實體伺服器安全性', '備份應用程式資料', '管理共用文件的權限'], ans: ['更換故障的伺服器硬體', '管理實體伺服器安全性'] },
+        { origId: 8, type: 'radio', q: '需要哪種硬體才能將區域網路正確連線到廣域網路 (WAN)？', opts: ['收發器', '第 2 層交換器', '獨立存取點', '路由器'], ans: ['路由器'] },
+        { origId: 9, type: 'matrix', q: '對於交換器的敘述，請選取 [正確] 或 [錯誤]', questions: ['交換器只會將單點傳播框架傳送至一個目的地連接埠。', '如果交換器不知道框架的傳送目標，會導致它濫發框架至各連接埠。', '交換器只會將廣播框架傳送至上行連接埠。'], ans: ['正確', '正確', '錯誤'] },
+        { origId: 10, type: 'dropdown', q: '請完成句子：___ 無線加密最容易遭到攔截和解密。', opts: ['WEP', 'WPA2', 'WPA-AES', 'WPA-PSK'], ans: ['WEP'] },
+        { origId: 11, type: 'radio', q: 'Teredo 通道的通訊協定可以：', opts: ['提供 VPN 安全性', '讓 IPv6 流量通過 IPv4 網路', '將 IPv4 轉譯為 IPv6', '動態配置 IPv6 位址'], ans: ['讓 IPv6 流量通過 IPv4 網路'] },
+        { origId: 12, type: 'checkbox', count: 2, q: 'Ping 公用程式用於哪兩個目的？', opts: ['自行測試主機本身的網路介面', '搜尋重複的位址', '將主機名稱解析為 IP 位址', '判斷是否可連線至主機', '掃描開放的防火牆連接埠'], ans: ['自行測試主機本身的網路介面', '判斷是否可連線至主機'] },
+        { origId: 13, type: 'matrix', q: '關於 Type 2 Hypervisor 和虛擬機器的敘述', questions: ['重新啟動一部虛擬機器，伺服器上的所有其他虛擬機器會同時重新啟動。', '重新啟動主機電腦，完全不影響同一個伺服器上的其他虛擬機器。', '如果必須重新啟動一部虛擬機器，您必須先重新啟動實體伺服器。'], ans: ['錯誤', '錯誤', '正確'] },
+        { origId: 14, type: 'checkbox', count: 2, q: '交換器具有哪兩個特性？', opts: ['交換器可識別所接收資料的預訂目的地。', '交換器可以同時傳送和接收資料。', '交換器造成的資料衝突比集線器更多。', '交換器會將每個框架傳送至所有與之連接的電腦。'], ans: ['交換器可識別所接收資料的預訂目的地。', '交換器可以同時傳送和接收資料。'] },
+        { origId: 15, type: 'radio', q: '您可以使用哪一種技術將內部網路延伸，跨到共用或公用網路？', opts: ['Microsoft ASP.NET', 'VPN', 'VLAN', 'Microsoft .NET Framework'], ans: ['VPN'] },
+        { origId: 16, type: 'dropdown', q: 'Linux 中用來列出主機使用中連入連線的命令列工具是：', opts: ['ip addr', 'host', 'netstat', 'dig'], ans: ['netstat'] },
+        { origId: 17, type: 'radio', q: '實作 VPN 可以提供：', opts: ['透過公用網路的安全連線。', '使用 IPSec 的額外加密。', '私人網路內的安全連線。', '選取電腦的額外安全性。'], ans: ['透過公用網路的安全連線。'] },
+        { origId: 18, type: 'dropdown', q: 'tracert 追蹤路由中的每個躍點都是：', opts: ['路由器', '交換器', '防火牆'], ans: ['路由器'] },
+        { origId: 19, type: 'dropdown_multi', q: '根據 ipconfig/all 輸出：', questions: ['無線介面卡的 IP 位址設定方式是', '乙太網路卡的 IP 位址設定方式是'], opts: ['手動', '透過 DHCP', '透過 APIPA'], ans: ['透過 DHCP', '透過 APIPA'] },
+        { origId: 20, type: 'radio', q: '動態路由的其中一個優點是：', opts: ['會自動啟用 DHCP。', '會限制衍生自路由通訊協定的流量。', '會減少廣播流量。', '會自動維護路由表。'], ans: ['會自動維護路由表。'] },
+        { origId: 22, type: 'checkbox', count: 2, q: '員工可存取內部網站，但無法存取外部網站。應完成哪兩個動作？', opts: ['檢查個別電腦上是否有故障的網路介面卡。', '連絡網際網路服務提供者 (ISP)。', '檢查每部電腦是否具備有效的 IP 位址。', '檢查路由器是否含有良好的網際網路連線能力。'], ans: ['連絡網際網路服務提供者 (ISP)。', '檢查路由器是否含有良好的網際網路連線能力。'] },
+        { origId: 23, type: 'radio', q: '必須在相距約 10 公里的地點之間安裝網路線。應該使用哪個項目？', opts: ['多重模式光纖', '單一模式光纖', 'Cat5e', 'Cat6'], ans: ['單一模式光纖'] },
+        { origId: 24, type: 'matrix', q: '關於物聯網 (IoT) 的敘述', questions: ['IoT 裝置有 IP 位址。', 'IoT 裝置需要與人互動才能與網路通訊。', '可利用應用程式開啟的智慧型恆溫器，屬於 IoT 範例。'], ans: ['正確', '錯誤', '正確'] },
+        { origId: 25, type: 'radio', q: '哪種通訊協定是於 TCP 模型的傳輸層運作？', opts: ['IGMP', 'UDP', 'FTP', 'IP'], ans: ['UDP'] },
+        { origId: 26, type: 'radio', q: '必須將路由器設定為啟用具有私人 IPv4 的用戶端以存取網際網路。應該設定什麼？', opts: ['DHCP', 'NAT', 'WAP', 'VPN'], ans: ['NAT'] },
+        { origId: 27, type: 'checkbox', count: 2, q: '有線乙太網路拓撲具有哪兩個特性？', opts: ['使用權杖來避免網路發生衝突。', '通常採用雙絞線或光纖媒體。', '使用實體 IP 位址編碼的網路介面卡。', '可以交涉不同的傳輸速度。'], ans: ['通常採用雙絞線或光纖媒體。', '可以交涉不同的傳輸速度。'] },
+        { origId: 28, type: 'radio', q: 'ftp.sunsetweb.org 的頂層網域是哪個？', opts: ['sunsetweb', 'sunsetweb.org', 'org', 'ftp'], ans: ['org'] },
+        { origId: 29, type: 'radio', q: '除了交換功能之外，還有哪個是多層交換器專屬的功能？', opts: ['管理用戶端電腦的位址', '橋接不同實體拓撲之間的流量', '提供第 3 層路由功能', '在各種網路通訊協定之間轉譯'], ans: ['提供第 3 層路由功能'] },
+        { origId: 31, type: 'radio', q: '機房中有一束 35 條纜線沒有標籤。應使用哪種工具來分離出正確的纜線？', opts: ['音頻查線器 (Toner)', '萬用電表', '纜線測試器', '時域反射計 (TDR)'], ans: ['音頻查線器 (Toner)'] },
+        { origId: 32, type: 'dropdown', q: 'Ping 公用程式使用 ___ 通訊協定來測試與遠端主機的通訊。', opts: ['BOOTP', 'HTTP', 'ICMP', 'OSPF', 'SNMP'], ans: ['ICMP'] },
+        { origId: 33, type: 'radio', q: '網際網路是根據哪一個網路拓樸所設計？', opts: ['環狀', '匯流排', '網狀', '星形'], ans: ['網狀'] },
+        { origId: 34, type: 'dropdown', q: '___ 具備容錯能力。', opts: ['靜態路由', '動態路由', '預設路由', '成本最低的路由'], ans: ['動態路由'] },
+        { origId: 35, type: 'radio', q: '哪種網路裝置會讓電腦相連、能遠端設定，並提供最佳的輸送量？', opts: ['路由器', '未受管理的交換器', '集線器', '受管理的交換器'], ans: ['受管理的交換器'] },
+        { origId: 37, type: 'radio', q: '工廠佈設網路，會經過重型製造設備(高干擾)。應該使用哪一種纜線？', opts: ['UTP Cat6', 'UTP Cat5e', 'Cat3', 'STP Cat5e'], ans: ['STP Cat5e'] },
+        { origId: 38, type: 'radio', q: '需要開啟防火牆讓朋友加入遊戲。哪一個命令會顯示電腦正在接聽的連接埠？', opts: ['netstat', 'ping', 'nslookup', 'nbtstat'], ans: ['netstat'] },
+        { origId: 39, type: 'dropdown', q: '每個 IPv4 位址都包含 ___。', opts: ['網路識別碼和主機識別碼', 'DNS 記錄和預設路由', 'MAC 位址和資料連結層位址'], ans: ['網路識別碼和主機識別碼'] },
+        { origId: 40, type: 'radio', q: '公司電腦透過單一地理位置的私有 Wi-Fi 交換資料。這是哪種網路？', opts: ['網際網路', '外部網路', '周邊網路', '內部網路'], ans: ['內部網路'] }
+    ];
+
+    // --- 系統狀態變數 ---
+    let quizData = [];
+    let currentIdx = 0;
+    let userAnswers = {}; // 儲存使用者的答案 userAnswers[origId] = array
+
+    // 陣列洗牌工具 (Fisher-Yates)
+    function shuffleArray(array) {
+        let newArr = [...array];
+        for (let i = newArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+        }
+        return newArr;
+    }
+
+    // 初始化測驗
+    function initQuiz() {
+        // 深拷貝並打亂題目順序
+        quizData = shuffleArray(JSON.parse(JSON.stringify(rawData)));
+        
+        // 打亂單選/多選題的選項順序
+        quizData.forEach(q => {
+            if (q.type === 'radio' || q.type === 'checkbox') {
+                q.opts = shuffleArray(q.opts);
+            }
+            userAnswers[q.origId] = []; // 初始化作答陣列
+        });
+
+        currentIdx = 0;
+        renderQuestion();
+    }
+
+    // 渲染當前題目
+    function renderQuestion() {
+        const q = quizData[currentIdx];
+        const container = document.getElementById('question-container');
+        document.getElementById('progress-text').textContent = `題目 ${currentIdx + 1} / ${quizData.length}`;
+        
+        let html = `<div class="question-title">${q.q}</div>`;
+        if (q.type === 'checkbox') html += `<div class="help-text">(請選擇 ${q.count} 個答案)</div>`;
+        
+        const currentAns = userAnswers[q.origId] || [];
+
+        // 依據題型渲染 UI
+        if (q.type === 'radio' || q.type === 'checkbox') {
+            html += `<ul class="options-list">`;
+            q.opts.forEach(opt => {
+                const isChecked = currentAns.includes(opt) ? 'checked' : '';
+                const inputType = q.type === 'radio' ? 'radio' : 'checkbox';
+                html += `
+                    <label class="option-item">
+                        <input type="${inputType}" name="q_${q.origId}" value="${opt}" ${isChecked} onchange="saveAnswer()">
+                        ${opt}
+                    </label>`;
+            });
+            html += `</ul>`;
+        } 
+        else if (q.type === 'dropdown') {
+            html += `<select id="sel_${q.origId}" onchange="saveAnswer()">
+                        <option value="" disabled ${currentAns.length===0 ? 'selected':''}>請選擇...</option>`;
+            q.opts.forEach(opt => {
+                const isSel = currentAns[0] === opt ? 'selected' : '';
+                html += `<option value="${opt}" ${isSel}>${opt}</option>`;
+            });
+            html += `</select>`;
+        }
+        else if (q.type === 'dropdown_multi') {
+            q.questions.forEach((subQ, i) => {
+                html += `<div><p>${subQ}</p><select id="sel_${q.origId}_${i}" onchange="saveAnswer()">
+                         <option value="" disabled ${!currentAns[i] ? 'selected':''}>請選擇...</option>`;
+                q.opts.forEach(opt => {
+                    const isSel = currentAns[i] === opt ? 'selected' : '';
+                    html += `<option value="${opt}" ${isSel}>${opt}</option>`;
+                });
+                html += `</select></div>`;
+            });
+        }
+        else if (q.type === 'matrix') {
+            html += `<table class="matrix-table"><tr><th>題目敘述</th><th>正確</th><th>錯誤</th></tr>`;
+            q.questions.forEach((subQ, i) => {
+                const isT = currentAns[i] === '正確' ? 'checked' : '';
+                const isF = currentAns[i] === '錯誤' ? 'checked' : '';
+                html += `<tr>
+                            <td>${subQ}</td>
+                            <td><input type="radio" name="m_${q.origId}_${i}" value="正確" ${isT} onchange="saveAnswer()"></td>
+                            <td><input type="radio" name="m_${q.origId}_${i}" value="錯誤" ${isF} onchange="saveAnswer()"></td>
+                         </tr>`;
+            });
+            html += `</table>`;
+        }
+
+        container.innerHTML = html;
+
+        // 按鈕顯示邏輯
+        document.getElementById('btn-prev').style.visibility = currentIdx === 0 ? 'hidden' : 'visible';
+        
+        if (currentIdx === quizData.length - 1) {
+            document.getElementById('btn-next').style.display = 'none';
+            document.getElementById('btn-submit').style.display = 'block';
+        } else {
+            document.getElementById('btn-next').style.display = 'block';
+            document.getElementById('btn-submit').style.display = 'none';
+        }
+    }
+
+    // 儲存使用者答案
+    function saveAnswer() {
+        const q = quizData[currentIdx];
+        let ansArray = [];
+
+        if (q.type === 'radio' || q.type === 'checkbox') {
+            const inputs = document.querySelectorAll(`input[name="q_${q.origId}"]:checked`);
+            inputs.forEach(input => ansArray.push(input.value));
+        } 
+        else if (q.type === 'dropdown') {
+            const val = document.getElementById(`sel_${q.origId}`).value;
+            if (val) ansArray.push(val);
+        }
+        else if (q.type === 'dropdown_multi') {
+            q.questions.forEach((_, i) => {
+                const val = document.getElementById(`sel_${q.origId}_${i}`).value;
+                ansArray[i] = val || null;
+            });
+        }
+        else if (q.type === 'matrix') {
+            q.questions.forEach((_, i) => {
+                const input = document.querySelector(`input[name="m_${q.origId}_${i}"]:checked`);
+                ansArray[i] = input ? input.value : null;
+            });
+        }
+        userAnswers[q.origId] = ansArray;
+    }
+
+    // 切換題目
+    function changeQuestion(step) {
+        saveAnswer();
+        currentIdx += step;
+        renderQuestion();
+    }
+
+    // 陣列比對函數 (忽略順序比對 Checkbox)
+    function arraysEqual(arr1, arr2) {
+        if (!arr1 || !arr2) return false;
+        if (arr1.length !== arr2.length) return false;
+        let sorted1 = [...arr1].sort();
+        let sorted2 = [...arr2].sort();
+        return sorted1.every((val, index) => val === sorted2[index]);
+    }
+
+    // 交卷與計算成績
+    function submitExam() {
+        saveAnswer();
+        if(!confirm('確定要交卷嗎？未作答的題目將不予計分。')) return;
+
+        let score = 0;
+        let reviewHTML = '';
+
+        quizData.forEach(q => {
+            const uAns = userAnswers[q.origId];
+            const cAns = q.ans;
+            let isCorrect = false;
+
+            // 判斷對錯邏輯
+            if (q.type === 'dropdown_multi' || q.type === 'matrix') {
+                // 陣列必須完全一致(包含順序)
+                isCorrect = JSON.stringify(uAns) === JSON.stringify(cAns);
+            } else {
+                // Radio, Checkbox, Dropdown 忽略順序比對
+                isCorrect = arraysEqual(uAns, cAns);
+            }
+
+            if (isCorrect) {
+                score++;
+            } else {
+                // 產生檢討卡片
+                let uAnsDisplay = uAns.filter(x=>x).length > 0 ? uAns.join(' , ') : '未作答';
+                let cAnsDisplay = cAns.join(' , ');
+                
+                reviewHTML += `
+                    <div class="review-card">
+                        <div class="orig-id-badge">原始題號：題目 ${q.origId} / 40</div>
+                        <div class="question-title">${q.q}</div>
+                        <div class="ans-wrong">你的答案：${uAnsDisplay}</div>
+                        <div class="ans-correct">正確答案：${cAnsDisplay}</div>
+                    </div>
+                `;
+            }
+        });
+
+        // 切換畫面
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+        document.getElementById('final-score').textContent = `${score} / ${quizData.length}`;
+        
+        const reviewContainer = document.getElementById('review-container');
+        if (score === quizData.length) {
+            reviewContainer.innerHTML = '<p style="color: green; font-weight: bold;">太強了！全對滿分，不需檢討！</p>';
+        } else {
+            reviewContainer.innerHTML = reviewHTML;
+        }
+    }
+
+    // 啟動系統
+    window.onload = initQuiz;
+
+</script>
+</body>
+</html>
