@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>網路基礎認證 - 終極模擬考</title>
+    <title>網路基礎認證 - 終極模擬考 40 題</title>
     <style>
         :root {
             --primary: #2c3e50;
@@ -29,7 +29,8 @@
         .matrix-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
         .matrix-table th, .matrix-table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         .matrix-table td:first-child { text-align: left; }
-        select { padding: 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 1em; width: 100%; max-width: 300px; margin-bottom: 10px;}
+        .dropdown-group { margin-bottom: 10px; background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 1em; width: 100%; max-width: 300px; margin-top: 5px; cursor: pointer; }
         
         /* 按鈕區 */
         .nav-buttons { display: flex; justify-content: space-between; margin-top: 30px; }
@@ -46,8 +47,11 @@
         .score-display { text-align: center; margin-bottom: 30px; }
         .score-display h1 { font-size: 4em; color: var(--primary); margin: 10px 0; }
         .review-card { background: #fff; border-left: 5px solid var(--danger); box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 15px; margin-bottom: 20px; border-radius: 0 4px 4px 0; }
-        .orig-id-badge { display: inline-block; background: var(--danger); color: white; padding: 3px 8px; border-radius: 3px; font-size: 0.85em; font-weight: bold; margin-bottom: 10px; }
-        .ans-wrong { color: var(--danger); font-weight: bold; }
+        
+        /* 特別強調原始題號的 Badge */
+        .orig-id-badge { display: inline-block; background: var(--primary); color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-bottom: 12px; letter-spacing: 1px;}
+        
+        .ans-wrong { color: var(--danger); font-weight: bold; margin-top: 10px; }
         .ans-correct { color: var(--success); font-weight: bold; margin-top: 5px;}
     </style>
 </head>
@@ -62,7 +66,7 @@
         <div class="nav-buttons">
             <button class="btn btn-prev" id="btn-prev" onclick="changeQuestion(-1)">上一題</button>
             <button class="btn btn-next" id="btn-next" onclick="changeQuestion(1)">下一題</button>
-            <button class="btn btn-submit" id="btn-submit" onclick="submitExam()">交卷</button>
+            <button class="btn btn-submit" id="btn-submit" onclick="submitExam()">交卷結算</button>
         </div>
     </div>
 
@@ -70,16 +74,17 @@
         <div class="score-display">
             <h2>測驗結束</h2>
             <h1 id="final-score">0 / 0</h1>
-            <button class="btn btn-next" onclick="location.reload()" style="margin-top: 20px;">重新測驗</button>
+            <button class="btn btn-next" onclick="location.reload()" style="margin-top: 20px;">重新測驗 (題目將重新洗牌)</button>
         </div>
-        <h3>錯題檢討：</h3>
+        <h3 style="border-bottom: 2px solid #ccc; padding-bottom: 10px;">錯題檢討 (標示截圖原題號)：</h3>
         <div id="review-container"></div>
     </div>
 </div>
 
 <script>
-    // --- 題庫資料 (已包含全部35題，支援多種題型) ---
+    // --- 完整 40 題題庫資料 ---
     const rawData = [
+        { origId: 1, type: 'dropdown_multi', q: '請將 VPN 詞彙與其對應的定義配對：', questions: ['可讓遠端使用者從網際網路上的任何位置連線到私人網路', '安全地連接私人網路的兩個部分或兩個私人網路', '在兩部網路裝置之間建立未加密的通道'], opts: ['SSL VPN', '站台對站台 VPN', '第 2 層通道通訊協定'], ans: ['SSL VPN', '站台對站台 VPN', '第 2 層通道通訊協定'] },
         { origId: 2, type: 'radio', q: '財務部門抱怨網路慢。顯示100Mbps但應是1000Mbps。該用哪種工具判斷纜線能否達到1000Mbps？', opts: ['音頻查線器', '纜線測試器', '萬用電表', '時域反射計 (TDR)'], ans: ['纜線測試器'] },
         { origId: 3, type: 'checkbox', count: 3, q: '客戶無法存取網際網路，您應該先完成哪三個動作？', opts: ['要求客戶將系統更新', '要求客戶刪除 Hosts 檔案', '要求客戶檢查數據機上的狀態指示燈', '要求客戶重新啟動數據機', '從遠端登入客戶的電腦', '執行線路測試檢查 ISP 連線'], ans: ['要求客戶檢查數據機上的狀態指示燈', '要求客戶重新啟動數據機', '執行線路測試檢查 ISP 連線'] },
         { origId: 4, type: 'radio', q: '哪種類型的網路涵蓋最大的區域？', opts: ['WAN', 'CAN', 'PAN', 'LAN'], ans: ['WAN'] },
@@ -99,6 +104,7 @@
         { origId: 18, type: 'dropdown', q: 'tracert 追蹤路由中的每個躍點都是：', opts: ['路由器', '交換器', '防火牆'], ans: ['路由器'] },
         { origId: 19, type: 'dropdown_multi', q: '根據 ipconfig/all 輸出：', questions: ['無線介面卡的 IP 位址設定方式是', '乙太網路卡的 IP 位址設定方式是'], opts: ['手動', '透過 DHCP', '透過 APIPA'], ans: ['透過 DHCP', '透過 APIPA'] },
         { origId: 20, type: 'radio', q: '動態路由的其中一個優點是：', opts: ['會自動啟用 DHCP。', '會限制衍生自路由通訊協定的流量。', '會減少廣播流量。', '會自動維護路由表。'], ans: ['會自動維護路由表。'] },
+        { origId: 21, type: 'dropdown_multi', q: '請將位址類型與其對應的範圍配對：', questions: ['127.0.0.0 – 127.255.255.255', '192.168.0.0 – 192.168.255.255', '224.0.0.0 – 239.255.255.255'], opts: ['迴路位址', '私人網路位址', '多點傳送位址', '公用網路位址'], ans: ['迴路位址', '私人網路位址', '多點傳送位址'] },
         { origId: 22, type: 'checkbox', count: 2, q: '員工可存取內部網站，但無法存取外部網站。應完成哪兩個動作？', opts: ['檢查個別電腦上是否有故障的網路介面卡。', '連絡網際網路服務提供者 (ISP)。', '檢查每部電腦是否具備有效的 IP 位址。', '檢查路由器是否含有良好的網際網路連線能力。'], ans: ['連絡網際網路服務提供者 (ISP)。', '檢查路由器是否含有良好的網際網路連線能力。'] },
         { origId: 23, type: 'radio', q: '必須在相距約 10 公里的地點之間安裝網路線。應該使用哪個項目？', opts: ['多重模式光纖', '單一模式光纖', 'Cat5e', 'Cat6'], ans: ['單一模式光纖'] },
         { origId: 24, type: 'matrix', q: '關於物聯網 (IoT) 的敘述', questions: ['IoT 裝置有 IP 位址。', 'IoT 裝置需要與人互動才能與網路通訊。', '可利用應用程式開啟的智慧型恆溫器，屬於 IoT 範例。'], ans: ['正確', '錯誤', '正確'] },
@@ -107,11 +113,13 @@
         { origId: 27, type: 'checkbox', count: 2, q: '有線乙太網路拓撲具有哪兩個特性？', opts: ['使用權杖來避免網路發生衝突。', '通常採用雙絞線或光纖媒體。', '使用實體 IP 位址編碼的網路介面卡。', '可以交涉不同的傳輸速度。'], ans: ['通常採用雙絞線或光纖媒體。', '可以交涉不同的傳輸速度。'] },
         { origId: 28, type: 'radio', q: 'ftp.sunsetweb.org 的頂層網域是哪個？', opts: ['sunsetweb', 'sunsetweb.org', 'org', 'ftp'], ans: ['org'] },
         { origId: 29, type: 'radio', q: '除了交換功能之外，還有哪個是多層交換器專屬的功能？', opts: ['管理用戶端電腦的位址', '橋接不同實體拓撲之間的流量', '提供第 3 層路由功能', '在各種網路通訊協定之間轉譯'], ans: ['提供第 3 層路由功能'] },
+        { origId: 30, type: 'dropdown_multi', q: '請將 TCP 連接埠號碼與其對應的服務配對：', questions: ['FTP 服務', 'SMTP 服務', 'HTTPS 服務'], opts: ['21', '25', '53', '80', '443'], ans: ['21', '25', '443'] },
         { origId: 31, type: 'radio', q: '機房中有一束 35 條纜線沒有標籤。應使用哪種工具來分離出正確的纜線？', opts: ['音頻查線器 (Toner)', '萬用電表', '纜線測試器', '時域反射計 (TDR)'], ans: ['音頻查線器 (Toner)'] },
         { origId: 32, type: 'dropdown', q: 'Ping 公用程式使用 ___ 通訊協定來測試與遠端主機的通訊。', opts: ['BOOTP', 'HTTP', 'ICMP', 'OSPF', 'SNMP'], ans: ['ICMP'] },
         { origId: 33, type: 'radio', q: '網際網路是根據哪一個網路拓樸所設計？', opts: ['環狀', '匯流排', '網狀', '星形'], ans: ['網狀'] },
         { origId: 34, type: 'dropdown', q: '___ 具備容錯能力。', opts: ['靜態路由', '動態路由', '預設路由', '成本最低的路由'], ans: ['動態路由'] },
         { origId: 35, type: 'radio', q: '哪種網路裝置會讓電腦相連、能遠端設定，並提供最佳的輸送量？', opts: ['路由器', '未受管理的交換器', '集線器', '受管理的交換器'], ans: ['受管理的交換器'] },
+        { origId: 36, type: 'matrix', q: '對於遠端連線與 VPN 的敘述，請選取 [正確] 或 [錯誤]', questions: ['您可以使用 VPN，允許使用者透過網際網路與您的網路進行安全連線。', '如果使用者透過撥號連線來連線至網際網路，伺服器也必須透過撥號連線進行連線。', '您可以使用 RAS 通道，讓用戶端每次連線至網際網路時，即可啟用 VPN 連線。'], ans: ['正確', '錯誤', '正確'] },
         { origId: 37, type: 'radio', q: '工廠佈設網路，會經過重型製造設備(高干擾)。應該使用哪一種纜線？', opts: ['UTP Cat6', 'UTP Cat5e', 'Cat3', 'STP Cat5e'], ans: ['STP Cat5e'] },
         { origId: 38, type: 'radio', q: '需要開啟防火牆讓朋友加入遊戲。哪一個命令會顯示電腦正在接聽的連接埠？', opts: ['netstat', 'ping', 'nslookup', 'nbtstat'], ans: ['netstat'] },
         { origId: 39, type: 'dropdown', q: '每個 IPv4 位址都包含 ___。', opts: ['網路識別碼和主機識別碼', 'DNS 記錄和預設路由', 'MAC 位址和資料連結層位址'], ans: ['網路識別碼和主機識別碼'] },
@@ -121,9 +129,9 @@
     // --- 系統狀態變數 ---
     let quizData = [];
     let currentIdx = 0;
-    let userAnswers = {}; // 儲存使用者的答案 userAnswers[origId] = array
+    let userAnswers = {};
 
-    // 陣列洗牌工具 (Fisher-Yates)
+    // 陣列洗牌工具
     function shuffleArray(array) {
         let newArr = [...array];
         for (let i = newArr.length - 1; i > 0; i--) {
@@ -135,17 +143,13 @@
 
     // 初始化測驗
     function initQuiz() {
-        // 深拷貝並打亂題目順序
         quizData = shuffleArray(JSON.parse(JSON.stringify(rawData)));
-        
-        // 打亂單選/多選題的選項順序
         quizData.forEach(q => {
             if (q.type === 'radio' || q.type === 'checkbox') {
                 q.opts = shuffleArray(q.opts);
             }
-            userAnswers[q.origId] = []; // 初始化作答陣列
+            userAnswers[q.origId] = []; 
         });
-
         currentIdx = 0;
         renderQuestion();
     }
@@ -154,7 +158,7 @@
     function renderQuestion() {
         const q = quizData[currentIdx];
         const container = document.getElementById('question-container');
-        document.getElementById('progress-text').textContent = `題目 ${currentIdx + 1} / ${quizData.length}`;
+        document.getElementById('progress-text').textContent = `測驗進度 ${currentIdx + 1} / ${quizData.length}`;
         
         let html = `<div class="question-title">${q.q}</div>`;
         if (q.type === 'checkbox') html += `<div class="help-text">(請選擇 ${q.count} 個答案)</div>`;
@@ -186,8 +190,8 @@
         }
         else if (q.type === 'dropdown_multi') {
             q.questions.forEach((subQ, i) => {
-                html += `<div><p>${subQ}</p><select id="sel_${q.origId}_${i}" onchange="saveAnswer()">
-                         <option value="" disabled ${!currentAns[i] ? 'selected':''}>請選擇...</option>`;
+                html += `<div class="dropdown-group"><p style="margin: 0 0 5px 0;">${subQ}</p><select id="sel_${q.origId}_${i}" onchange="saveAnswer()">
+                         <option value="" disabled ${!currentAns[i] ? 'selected':''}>請選擇對應答案...</option>`;
                 q.opts.forEach(opt => {
                     const isSel = currentAns[i] === opt ? 'selected' : '';
                     html += `<option value="${opt}" ${isSel}>${opt}</option>`;
@@ -211,7 +215,6 @@
 
         container.innerHTML = html;
 
-        // 按鈕顯示邏輯
         document.getElementById('btn-prev').style.visibility = currentIdx === 0 ? 'hidden' : 'visible';
         
         if (currentIdx === quizData.length - 1) {
@@ -223,7 +226,7 @@
         }
     }
 
-    // 儲存使用者答案
+    // 儲存答案
     function saveAnswer() {
         const q = quizData[currentIdx];
         let ansArray = [];
@@ -258,7 +261,7 @@
         renderQuestion();
     }
 
-    // 陣列比對函數 (忽略順序比對 Checkbox)
+    // 陣列比對
     function arraysEqual(arr1, arr2) {
         if (!arr1 || !arr2) return false;
         if (arr1.length !== arr2.length) return false;
@@ -275,30 +278,30 @@
         let score = 0;
         let reviewHTML = '';
 
-        quizData.forEach(q => {
+        // 將題目依照「原始題號(origId)」由小到大排序，方便檢討
+        let reviewData = [...quizData].sort((a, b) => a.origId - b.origId);
+
+        reviewData.forEach(q => {
             const uAns = userAnswers[q.origId];
             const cAns = q.ans;
             let isCorrect = false;
 
-            // 判斷對錯邏輯
             if (q.type === 'dropdown_multi' || q.type === 'matrix') {
-                // 陣列必須完全一致(包含順序)
                 isCorrect = JSON.stringify(uAns) === JSON.stringify(cAns);
             } else {
-                // Radio, Checkbox, Dropdown 忽略順序比對
                 isCorrect = arraysEqual(uAns, cAns);
             }
 
             if (isCorrect) {
                 score++;
             } else {
-                // 產生檢討卡片
-                let uAnsDisplay = uAns.filter(x=>x).length > 0 ? uAns.join(' , ') : '未作答';
+                let uAnsDisplay = uAns.filter(x=>x).length > 0 ? uAns.join(' , ') : '未作答 或 填寫不完整';
                 let cAnsDisplay = cAns.join(' , ');
                 
+                // 這裡就是關鍵！直接調用 q.origId 標示截圖原題號
                 reviewHTML += `
                     <div class="review-card">
-                        <div class="orig-id-badge">原始題號：題目 ${q.origId} / 40</div>
+                        <div class="orig-id-badge">🎯 截圖原題號：第 ${q.origId} 題</div>
                         <div class="question-title">${q.q}</div>
                         <div class="ans-wrong">你的答案：${uAnsDisplay}</div>
                         <div class="ans-correct">正確答案：${cAnsDisplay}</div>
@@ -307,14 +310,13 @@
             }
         });
 
-        // 切換畫面
         document.getElementById('quiz-screen').style.display = 'none';
         document.getElementById('result-screen').style.display = 'block';
         document.getElementById('final-score').textContent = `${score} / ${quizData.length}`;
         
         const reviewContainer = document.getElementById('review-container');
         if (score === quizData.length) {
-            reviewContainer.innerHTML = '<p style="color: green; font-weight: bold;">太強了！全對滿分，不需檢討！</p>';
+            reviewContainer.innerHTML = '<h2 style="color: #27ae60; text-align: center;">太強了！全對滿分，完全不需要檢討！🎉</h2>';
         } else {
             reviewContainer.innerHTML = reviewHTML;
         }
